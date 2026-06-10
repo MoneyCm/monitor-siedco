@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+siedco_*.png
+siedco_error_*.png
+resumen_actual.json
+resumen_anterior.json
+reporte_siedco_prueba.html
