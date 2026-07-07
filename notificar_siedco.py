@@ -230,10 +230,11 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
         print(f"Advertencia: No se encontró la captura en {representative_image_path} para adjuntar.")
 
     # Conectar al SMTP SSL de Gmail y enviar
-    print(f"Conectando al SMTP de Gmail para enviar reporte consolidado a {EMAIL_DEST}...")
+    lista_destinatarios = [email.strip() for email in EMAIL_DEST.split(",") if email.strip()]
+    print(f"Conectando al SMTP de Gmail para enviar reporte consolidado a {lista_destinatarios}...")
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(GMAIL_USER, GMAIL_PASS)
-        server.sendmail(GMAIL_USER, EMAIL_DEST, msg.as_string())
+        server.sendmail(GMAIL_USER, lista_destinatarios, msg.as_string())
     print(f"[OK] Alerta de correo SIEDCO consolidada enviada exitosamente a {EMAIL_DEST}.")
 
 if __name__ == "__main__":
