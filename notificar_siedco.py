@@ -240,15 +240,15 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
 if __name__ == "__main__":
     # Datos de prueba para correr notificar_siedco.py directamente con errores
     test_data = {
-        "Homicidios": {"2025": 49, "2026": 59, "estado": "OK"},
-        "Hurto a personas": {"2025": 320, "2026": 280, "estado": "OK"},
-        "Hurto a residencias": {"2025": 94, "2026": 105, "estado": "OK"},
-        "Hurto a comercio": {"2025": 112, "2026": 95, "estado": "OK"},
-        "Hurto automotores": {"2025": 25, "2026": 30, "estado": "OK"},
-        "Hurto motocicletas": {"2025": 140, "2026": 165, "estado": "OK"},
-        "Lesiones personales": {"2025": 210, "2026": 245, "estado": "OK"},
-        "Extorsión": {"2025": None, "2026": None, "estado": "ERROR: Timeout 60000ms exceeded"},
-        "Violencia intrafamiliar": {"2025": 190, "2026": 175, "estado": "OK"}
+        "Homicidios": {"2025": 58, "2026": 61, "estado": "OK"},
+        "Hurto a personas": {"2025": 232, "2026": 197, "estado": "OK"},
+        "Hurto a residencias": {"2025": 31, "2026": 35, "estado": "OK"},
+        "Hurto a comercio": {"2025": 32, "2026": 31, "estado": "OK"},
+        "Hurto automotores": {"2025": 25, "2026": 36, "estado": "OK"},
+        "Hurto motocicletas": {"2025": 68, "2026": 92, "estado": "OK"},
+        "Lesiones personales": {"2025": 171, "2026": 151, "estado": "OK"},
+        "Extorsión": {"2025": 308374, "2026": 1051159, "estado": "OK"},
+        "Violencia intrafamiliar": {"2025": 111, "2026": 139, "estado": "OK"}
     }
     TEST_IMG = Path(__file__).resolve().parent / "siedco_homicidios.png"
     if not TEST_IMG.exists():
