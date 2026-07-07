@@ -22,6 +22,7 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
     
     # Construir las filas de la tabla de delitos en HTML
     filas_delitos_html = ""
+    filas_operativos_html = ""
     resumen_novedades_list = []
     
     # Ordenar delitos colocando Homicidios primero, y luego por orden alfabético
@@ -32,11 +33,12 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
     
     for delito in delitos_ordenados:
         valores = datos_delitos[delito]
+        tipo_tematica = valores.get("tipo", "delito")
         estado_delito = valores.get("estado", "OK")
         
         # Si el delito falló en la recolección, se pinta una fila de error destacada
         if estado_delito != "OK":
-            filas_delitos_html += f"""
+            fila_err = f"""
             <tr style="border-bottom: 1px solid #eef0f7; background-color: #fffafb;">
               <td style="padding: 10px 12px; font-size: 13px; font-weight: bold; color: #1A1A2E;">{delito}</td>
               <td style="padding: 10px 12px; font-size: 13px; text-align: center; color: #a1a3b5;">—</td>
@@ -45,6 +47,10 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
               <td style="padding: 10px 12px; font-size: 11px; text-align: center; font-weight: bold; color: #c0392b; background-color: #fdf2f2; border-radius: 4px; display: inline-block; margin: 6px 12px; padding: 4px 8px;">{estado_delito}</td>
             </tr>
             """
+            if tipo_tematica == "operativo":
+                filas_operativos_html += fila_err
+            else:
+                filas_delitos_html += fila_err
             continue
             
         v_2025 = valores.get("2025", 0) or 0
@@ -64,11 +70,19 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
         
         # Colores e iconos de estado
         if diff > 0:
-            color = "#C0392B"  # Rojo para aumentos
-            estado = "SUBE ▲"
+            if tipo_tematica == "operativo":
+                color = "#1A7A4A"  # Verde para aumento en operativos (acciones positivas)
+                estado = "SUBE ▲"
+            else:
+                color = "#C0392B"  # Rojo para aumentos en delitos
+                estado = "SUBE ▲"
         elif diff < 0:
-            color = "#1A7A4A"  # Verde para disminuciones
-            estado = "BAJA ▼"
+            if tipo_tematica == "operativo":
+                color = "#C0392B"  # Rojo para reducción en operativos
+                estado = "BAJA ▼"
+            else:
+                color = "#1A7A4A"  # Verde para disminuciones en delitos
+                estado = "BAJA ▼"
         else:
             color = "#606175"  # Gris sin cambios
             estado = "IGUAL ＝"
@@ -79,7 +93,7 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
                 f"<li><b>{delito}</b>: {v_2025} -> {v_2026} ({var_pct_str})</li>"
             )
             
-        filas_delitos_html += f"""
+        fila_ok = f"""
         <tr style="border-bottom: 1px solid #eef0f7;">
           <td style="padding: 10px 12px; font-size: 13px; font-weight: bold; color: #1A1A2E;">{delito}</td>
           <td style="padding: 10px 12px; font-size: 13px; text-align: center; color: #606175;">{v_2025}</td>
@@ -88,6 +102,10 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
           <td style="padding: 10px 12px; font-size: 12px; text-align: center; font-weight: bold; color: {color};">{estado} ({var_pct_str})</td>
         </tr>
         """
+        if tipo_tematica == "operativo":
+            filas_operativos_html += fila_ok
+        else:
+            filas_delitos_html += fila_ok
         
     novedades_box_html = ""
     if resumen_novedades_list:
@@ -146,6 +164,27 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
             </thead>
             <tbody>
               {filas_delitos_html}
+            </tbody>
+          </table>
+          
+          <h2 style="color: #281FD0; font-size: 18px; margin: 28px 0 8px;">Actividad Operativa de la Fuerza Pública</h2>
+          <p style="color: #606175; font-size: 13px; margin: 0 0 20px; line-height: 1.5;">
+            Acciones preventivas, detenciones y recuperación de bienes registradas en el municipio:
+          </p>
+          
+          <!-- Tabla Consolidada de Operativos -->
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+            <thead>
+              <tr style="background: #281FD0; color: white; border-bottom: 3px solid #FFE000;">
+                <th style="padding: 10px 12px; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: left; letter-spacing: 0.5px;">Acción Operativa</th>
+                <th style="padding: 10px 12px; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; letter-spacing: 0.5px; width: 12%;">Año 2025</th>
+                <th style="padding: 10px 12px; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; letter-spacing: 0.5px; width: 12%;">Año 2026</th>
+                <th style="padding: 10px 12px; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; letter-spacing: 0.5px; width: 12%;">Var</th>
+                <th style="padding: 10px 12px; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; letter-spacing: 0.5px; width: 26%;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas_operativos_html}
             </tbody>
           </table>
           
@@ -240,15 +279,17 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
 if __name__ == "__main__":
     # Datos de prueba para correr notificar_siedco.py directamente con errores
     test_data = {
-        "Homicidios": {"2025": 58, "2026": 61, "estado": "OK"},
-        "Hurto a personas": {"2025": 232, "2026": 197, "estado": "OK"},
-        "Hurto a residencias": {"2025": 31, "2026": 35, "estado": "OK"},
-        "Hurto a comercio": {"2025": 32, "2026": 31, "estado": "OK"},
-        "Hurto automotores": {"2025": 25, "2026": 36, "estado": "OK"},
-        "Hurto motocicletas": {"2025": 68, "2026": 92, "estado": "OK"},
-        "Lesiones personales": {"2025": 171, "2026": 151, "estado": "OK"},
-        "Extorsión": {"2025": 308374, "2026": 1051159, "estado": "OK"},
-        "Violencia intrafamiliar": {"2025": 111, "2026": 139, "estado": "OK"}
+        "Homicidios": {"2025": 58, "2026": 61, "estado": "OK", "tipo": "delito"},
+        "Hurto a personas": {"2025": 232, "2026": 197, "estado": "OK", "tipo": "delito"},
+        "Hurto a residencias": {"2025": 31, "2026": 35, "estado": "OK", "tipo": "delito"},
+        "Hurto a comercio": {"2025": 32, "2026": 31, "estado": "OK", "tipo": "delito"},
+        "Hurto automotores": {"2025": 25, "2026": 36, "estado": "OK", "tipo": "delito"},
+        "Hurto motocicletas": {"2025": 68, "2026": 92, "estado": "OK", "tipo": "delito"},
+        "Lesiones personales": {"2025": 171, "2026": 151, "estado": "OK", "tipo": "delito"},
+        "Violencia intrafamiliar": {"2025": 111, "2026": 139, "estado": "OK", "tipo": "delito"},
+        "Capturas": {"2025": 84, "2026": 95, "estado": "OK", "tipo": "operativo"},
+        "Automotores recuperados": {"2025": 12, "2026": 15, "estado": "OK", "tipo": "operativo"},
+        "Motocicletas recuperadas": {"2025": 34, "2026": 42, "estado": "OK", "tipo": "operativo"}
     }
     TEST_IMG = Path(__file__).resolve().parent / "siedco_homicidios.png"
     if not TEST_IMG.exists():

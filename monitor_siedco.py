@@ -22,21 +22,27 @@ ESCUDO_PATH = BASE_DIR / "escudo_jamundi.png"
 
 # Temáticas prioritarias a monitorear con sus respectivos patrones de búsqueda en el DOM
 TEMATICAS = [
-    {"nombre": "Homicidios", "keywords": ["homicidio"], "pattern": "Homicidios"},
-    {"nombre": "Hurto a personas", "keywords": ["hurto", "personas"], "pattern": "Hurto.*personas"},
-    {"nombre": "Hurto a residencias", "keywords": ["hurto", "residencias"], "pattern": "Hurto.*residencias"},
-    {"nombre": "Hurto a comercio", "keywords": ["hurto", "comercio"], "pattern": "Hurto.*comercio"},
-    {"nombre": "Hurto automotores", "keywords": ["hurto", "automotor"], "pattern": "Hurto.*automotores"},
-    {"nombre": "Hurto motocicletas", "keywords": ["hurto", "motocicleta"], "pattern": "Hurto.*motocicletas"},
-    {"nombre": "Lesiones personales", "keywords": ["lesiones"], "pattern": "Lesiones.*personales"},
-    {"nombre": "Extorsión", "keywords": ["extorsi"], "pattern": "Extorsi[oó]n"},
-    {"nombre": "Violencia intrafamiliar", "keywords": ["intrafamiliar"], "pattern": "Violencia.*intrafamiliar"}
+    # DELITOS
+    {"nombre": "Homicidios", "keywords": ["homicidio"], "pattern": "Homicidios", "tipo": "delito"},
+    {"nombre": "Hurto a personas", "keywords": ["hurto", "personas"], "pattern": "Hurto.*personas", "tipo": "delito"},
+    {"nombre": "Hurto a residencias", "keywords": ["hurto", "residencias"], "pattern": "Hurto.*residencias", "tipo": "delito"},
+    {"nombre": "Hurto a comercio", "keywords": ["hurto", "comercio"], "pattern": "Hurto.*comercio", "tipo": "delito"},
+    {"nombre": "Hurto automotores", "keywords": ["hurto", "automotor"], "pattern": "Hurto.*automotores", "tipo": "delito"},
+    {"nombre": "Hurto motocicletas", "keywords": ["hurto", "motocicleta"], "pattern": "Hurto.*motocicletas", "tipo": "delito"},
+    {"nombre": "Lesiones personales", "keywords": ["lesiones"], "pattern": "Lesiones.*personales", "tipo": "delito"},
+    {"nombre": "Violencia intrafamiliar", "keywords": ["intrafamiliar"], "pattern": "Violencia.*intrafamiliar", "tipo": "delito"},
+    # OPERATIVOS
+    {"nombre": "Capturas", "keywords": ["capturas"], "pattern": None, "tipo": "operativo"},
+    {"nombre": "Automotores recuperados", "keywords": ["automotores", "recuperados"], "pattern": None, "tipo": "operativo"},
+    {"nombre": "Motocicletas recuperadas", "keywords": ["motocicletas", "recuperadas"], "pattern": None, "tipo": "operativo"}
 ]
 
 def extraer_casos(text, delito_pattern, anio):
     # 1. Intentar con el patrón específico del delito (ej: "Homicidios | Año 2025")
-    patron_especifico = rf"{delito_pattern}\s*\|\s*A.{{1,2}}o\s*{anio}\s*\n\s*([\d,.]+)"
-    match = re.search(patron_especifico, text, re.IGNORECASE)
+    match = None
+    if delito_pattern:
+        patron_especifico = rf"{delito_pattern}\s*\|\s*A.{{1,2}}o\s*{anio}\s*\n\s*([\d,.]+)"
+        match = re.search(patron_especifico, text, re.IGNORECASE)
     
     # 2. Si falla, usar patrón genérico (ej: "Sin título | Año 2025" o cualquier texto/espacio antes del pipe)
     if not match:
@@ -96,7 +102,7 @@ def aplicar_filtro_qlik(page, panel_titulo, valor_busqueda, valor_confirmar=None
     confirm_btn.click(force=True)
     page.wait_for_timeout(5000)
 
-def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern):
+def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern, tipo_tematica):
     context = browser.new_context(ignore_https_errors=True)
     page = context.new_page()
     url = "https://portalsiedco.policia.gov.co:4443/extensions/PortalPublico/index.html#/home"
@@ -184,7 +190,7 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
         
         # Esperar dinámicamente a que Qlik Sense aplique la temática (filtro de Delito) en el dashboard
         filtro_tematica_ok = True
-        if delito_nombre.lower() != "extorsión":
+        if tipo_tematica == "delito":
             print("  Esperando dinámicamente la aplicación del filtro 'Delito'...")
             filtro_aplicado = False
             for _ in range(30):
@@ -200,7 +206,7 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
                 filtro_tematica_ok = False
             page.wait_for_timeout(3000)  # Estabilización final
         else:
-            page.wait_for_timeout(8000)  # Espera fija para Extorsión que no usa el filtro Delito en el dashboard Operativo
+            page.wait_for_timeout(8000)  # Espera fija para Operativos que no usan el filtro Delito
         
         # Aplicar filtros usando la función robusta
         aplicar_filtro_qlik(page, "Departamento", "VALLE")
@@ -224,7 +230,7 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
             return None, None, "ERROR: Falló parseo de números del DOM"
             
         # Validar si el filtro de Delito no se aplicó (retornó totales departamentales/municipales sin filtrar)
-        if delito_nombre.lower() != "extorsión":
+        if tipo_tematica == "delito":
             if not filtro_tematica_ok or (casos_2025 == 308374 and casos_2026 == 1051159):
                 return None, None, "ERROR: Filtro de Delito no se aplicó (se detectaron cifras acumuladas totales)"
             
@@ -259,12 +265,13 @@ def main():
             nombre = temp["nombre"]
             keywords = temp["keywords"]
             pattern = temp["pattern"]
+            tipo = temp["tipo"]
             
             # Reintento robusto para cada delito (hasta 5 intentos)
             v_25, v_26, estado = None, None, "ERROR: No iniciado"
             for intento in range(5):
                 print(f"Intento {intento + 1} para extraer {nombre}...")
-                v_25, v_26, estado = extraer_datos_delito(browser, nombre, keywords, pattern)
+                v_25, v_26, estado = extraer_datos_delito(browser, nombre, keywords, pattern, tipo)
                 if estado == "OK":
                     break
                 print(f"  [AVISO] Falló extracción de {nombre} en intento {intento + 1} (Estado: {estado}). Reintentando en 6s...")
@@ -273,7 +280,8 @@ def main():
             datos_consolidados[nombre] = {
                 "2025": v_25,
                 "2026": v_26,
-                "estado": estado
+                "estado": estado,
+                "tipo": tipo
             }
             print("-" * 50)
             
