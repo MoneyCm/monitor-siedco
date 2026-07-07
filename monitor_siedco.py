@@ -22,21 +22,27 @@ ESCUDO_PATH = BASE_DIR / "escudo_jamundi.png"
 
 # Temáticas prioritarias a monitorear con sus respectivos patrones de búsqueda en el DOM
 TEMATICAS = [
-    {"nombre": "Homicidios", "pattern": "Homicidios"},
-    {"nombre": "Hurto a personas", "pattern": "Hurto.*personas"},
-    {"nombre": "Hurto a residencias", "pattern": "Hurto.*residencias"},
-    {"nombre": "Hurto a comercio", "pattern": "Hurto.*comercio"},
-    {"nombre": "Hurto automotores", "pattern": "Hurto.*automotores"},
-    {"nombre": "Hurto motocicletas", "pattern": "Hurto.*motocicletas"},
-    {"nombre": "Lesiones personales", "pattern": "Lesiones.*personales"},
-    {"nombre": "Extorsión", "pattern": "Extorsi[oó]n"},
-    {"nombre": "Violencia intrafamiliar", "pattern": "Violencia.*intrafamiliar"}
+    {"nombre": "Homicidios", "keywords": ["homicidio"], "pattern": "Homicidios"},
+    {"nombre": "Hurto a personas", "keywords": ["hurto", "personas"], "pattern": "Hurto.*personas"},
+    {"nombre": "Hurto a residencias", "keywords": ["hurto", "residencias"], "pattern": "Hurto.*residencias"},
+    {"nombre": "Hurto a comercio", "keywords": ["hurto", "comercio"], "pattern": "Hurto.*comercio"},
+    {"nombre": "Hurto automotores", "keywords": ["hurto", "automotor"], "pattern": "Hurto.*automotores"},
+    {"nombre": "Hurto motocicletas", "keywords": ["hurto", "motocicleta"], "pattern": "Hurto.*motocicletas"},
+    {"nombre": "Lesiones personales", "keywords": ["lesiones"], "pattern": "Lesiones.*personales"},
+    {"nombre": "Extorsión", "keywords": ["extorsi"], "pattern": "Extorsi[oó]n"},
+    {"nombre": "Violencia intrafamiliar", "keywords": ["intrafamiliar"], "pattern": "Violencia.*intrafamiliar"}
 ]
 
 def extraer_casos(text, delito_pattern, anio):
-    # Expresión regular flexible para buscar "[delito_pattern] | Año/Ano XXXX" seguido del valor
-    patron = rf"{delito_pattern}\s*\|\s*A[ñn]o\s*{anio}\s*\n\s*([\d,.]+)"
-    match = re.search(patron, text, re.IGNORECASE)
+    # 1. Intentar con el patrón específico del delito (ej: "Homicidios | Año 2025")
+    patron_especifico = rf"{delito_pattern}\s*\|\s*A.{{1,2}}o\s*{anio}\s*\n\s*([\d,.]+)"
+    match = re.search(patron_especifico, text, re.IGNORECASE)
+    
+    # 2. Si falla, usar patrón genérico (ej: "Sin título | Año 2025" o cualquier texto/espacio antes del pipe)
+    if not match:
+        patron_generico = rf"(?:[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]*)\|\s*A.{{1,2}}o\s*{anio}\s*\n\s*([\d,.]+)"
+        match = re.search(patron_generico, text, re.IGNORECASE)
+        
     if match:
         valor_str = match.group(1).replace(",", "").replace(".", "")
         try:
@@ -62,7 +68,7 @@ def aplicar_filtro_qlik(page, panel_titulo, valor_busqueda, valor_confirmar=None
     for intento in range(3):
         listbox.click(force=True)
         try:
-            search_input_locator.first.wait_for(state="visible", timeout=3000)
+            search_input_locator.first.wait_for(state="visible", timeout=5000)
             panel_abierto = True
             break
         except Exception:
@@ -79,42 +85,18 @@ def aplicar_filtro_qlik(page, panel_titulo, valor_busqueda, valor_confirmar=None
     search_field.press_sequentially(valor_busqueda, delay=100)
     page.wait_for_timeout(2500)  # Espera para sincronización WebSocket
     
+    print(f"  Seleccionando la opción '{valor_confirmar}'...")
     item_selector = page.locator("[data-testid='listbox.item']", has_text=valor_confirmar).first
-    item_selector.wait_for(state="visible", timeout=10000)
+    item_selector.wait_for(state="visible", timeout=15000)
+    item_selector.click(force=True)
+    page.wait_for_timeout(1500)
     
-    # Hacer clic robusto y verificar que aparezca el botón de confirmación
-    confirm_btn = page.locator(".actions-toolbar-confirm:visible").first
-    seleccion_realizada = False
-    for intento in range(3):
-        item_selector.click(force=True)
-        page.wait_for_timeout(1200)
-        if confirm_btn.is_visible():
-            seleccion_realizada = True
-            break
-        else:
-            print(f"    [AVISO] No se detectó barra de confirmación tras click (Intento {intento + 1}). Reintentando...")
-            page.wait_for_timeout(1000)
-            
-    if not seleccion_realizada:
-        print(f"    [AVISO] Se procede sin detectar barra de confirmación explícita para {panel_titulo}.")
-        
     print(f"  Confirmando selección de {panel_titulo}...")
-    if confirm_btn.is_visible():
-        confirm_btn.click(force=True)
-        try:
-            confirm_btn.wait_for(state="hidden", timeout=5000)
-        except Exception:
-            pass
-    else:
-        # Clic genérico de confirmación
-        try:
-            page.locator(".actions-toolbar-confirm:visible").first.click(force=True)
-        except Exception:
-            pass
-            
-    page.wait_for_timeout(2500)
+    confirm_btn = page.locator(".qs-actions-confirm:visible, .qv-confirm-button:visible, button[title*='Confirmar']:visible, .actions-toolbar-confirm:visible").first
+    confirm_btn.click(force=True)
+    page.wait_for_timeout(5000)
 
-def extraer_datos_delito(browser, delito_nombre, delito_pattern):
+def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern):
     context = browser.new_context(ignore_https_errors=True)
     page = context.new_page()
     url = "https://portalsiedco.policia.gov.co:4443/extensions/PortalPublico/index.html#/home"
@@ -122,58 +104,110 @@ def extraer_datos_delito(browser, delito_nombre, delito_pattern):
     try:
         print(f"Navegando al portal de SIEDCO para: {delito_nombre}...")
         page.goto(url, wait_until="networkidle", timeout=60000)
-        # Espera de estabilización inicial para asegurar carga del WebSocket
-        page.wait_for_timeout(6000)
+        # Esperar a que los combos de temáticas y años carguen las opciones en el DOM
+        print("  Esperando a que el combo de temáticas cargue las opciones...")
+        try:
+            page.locator("select#tematicasCombo option").nth(1).wait_for(state="attached", timeout=25000)
+            page.locator("select[id$='osCombo'] option").nth(1).wait_for(state="attached", timeout=15000)
+        except Exception as err_wait:
+            print(f"  [AVISO] Espera de opciones falló/agotó tiempo: {err_wait}")
+            
+        # Espera adicional de estabilización
+        page.wait_for_timeout(3000)
         
-        # 1. Seleccionar temática y año usando inyección limpia de AngularJS Scope y DOM
-        print(f"  Inyectando Angular para '{delito_nombre}' y Año: 2026...")
-        js_result = page.evaluate(f"""() => {{
+        # 1. Buscar la etiqueta de la temática en el Angular Scope y seleccionarla con Playwright de forma nativa
+        import json
+        keywords_str = json.dumps(delito_keywords)
+        print(f"  Buscando opción en combo para '{delito_nombre}' (Keywords: {delito_keywords})...")
+        option_label = page.evaluate(f"""() => {{
             const sel = document.getElementById('tematicasCombo');
-            if (!sel) return "No select element found";
+            if (!sel) return null;
             const scope = angular.element(sel).scope();
-            if (!scope) return "No scope found";
-            
-            // Buscar la opción del delito
-            const optionObj = scope.tematicasCombo.find(item => item.label.includes('{delito_nombre}'));
-            if (!optionObj) return "Option not found in scope for label '{delito_nombre}'";
-            
-            // Buscar año 2026
-            const selectedYear = scope.aniosCombo.find(y => y === 2026) || scope.aniosCombo[0] || 2026;
-            
-            // Sincronizar el DOM directamente
-            sel.value = optionObj.value;
-            sel.dispatchEvent(new Event('change'));
-            const selAnio = document.querySelector("select[id$='osCombo']");
-            if (selAnio) {{
-                selAnio.value = selectedYear.toString();
-                selAnio.dispatchEvent(new Event('change'));
-            }}
-            
-            scope.$apply(() => {{
-                scope.tematicaSeleccionada = optionObj;
-                scope.anioSeleccionado = selectedYear;
-                scope.getSeleccionesCombos();
+            if (!scope) return null;
+            const kws = {keywords_str};
+            const optionObj = scope.tematicasCombo.find(item => {{
+                const labelLower = item.label.toLowerCase();
+                return kws.every(kw => labelLower.includes(kw));
             }});
-            return "SUCCESS - Selected Year: " + selectedYear + ", Val: " + sel.value;
+            return optionObj ? optionObj.label : null;
         }}""")
         
-        if "SUCCESS" not in js_result:
-            return None, None, f"ERROR: Selección Angular fallida ({js_result[:60]})"
+        if not option_label:
+            return None, None, f"ERROR: No se encontró etiqueta para temática {delito_nombre}"
             
+        print(f"  Seleccionando temática '{option_label}'...")
+        page.select_option("select#tematicasCombo", label=option_label)
+        page.wait_for_timeout(1000)
+        
+        print("  Seleccionando Año 2026 de forma nativa...")
+        page.select_option("select[id$='osCombo']", label="2026")
+        page.wait_for_timeout(1000)
+        
+        # Forzar la sincronización del modelo de AngularJS con los valores del DOM
+        print("  Sincronizando el modelo AngularJS...")
+        sync_result = page.evaluate("""() => {
+            const selectTematica = document.getElementById('tematicasCombo');
+            const selectAnio = document.querySelector("select[id$='osCombo']");
+            if (!selectTematica || !selectAnio) return "Error: Elementos no encontrados";
+            
+            const scope = angular.element(selectTematica).scope();
+            if (!scope) return "Error: Scope de Angular no encontrado";
+            
+            const labelTematica = selectTematica.options[selectTematica.selectedIndex].text;
+            const labelAnio = selectAnio.options[selectAnio.selectedIndex].text;
+            
+            const optionObj = scope.tematicasCombo.find(item => item.label === labelTematica);
+            const selectedYear = scope.aniosCombo.find(y => y.toString() === labelAnio) || parseInt(labelAnio) || 2026;
+            
+            if (optionObj) {
+                scope.$apply(() => {
+                    scope.tematicaSeleccionada = optionObj;
+                    scope.anioSeleccionado = selectedYear;
+                    scope.getSeleccionesCombos();
+                });
+                return `Exitoso: Tematica=${labelTematica}, Año=${labelAnio}`;
+            }
+            return `Error: Objeto no encontrado en el scope para '${labelTematica}'`;
+        }""")
+        print(f"  [Angular Sync] {sync_result}")
         page.wait_for_timeout(1500)
         
-        # Esperar a que el botón se habilite orgánicamente en Angular y hacer clic
-        print("  Esperando a que Angular habilite el botón de entrar...")
-        btn_enter = page.locator(".btn-enter:not([disabled])").first
-        btn_enter.wait_for(state="visible", timeout=10000)
+        # Habilitar y hacer clic en el botón de entrar
+        print("  Haciendo clic en el botón de entrar...")
+        btn_enter = page.locator(".btn-enter").first
+        btn_enter.evaluate("el => el.removeAttribute('disabled')")
         btn_enter.click()
+        
+        # Esperar a que el dashboard de Qlik cargue completamente antes de interactuar con filtros
+        print("  Esperando a que el dashboard de Qlik cargue completamente...")
+        page.locator(".qv-object-filterpane", has_text="Departamento").first.wait_for(state="visible", timeout=60000)
+        
+        # Esperar dinámicamente a que Qlik Sense aplique la temática (filtro de Delito) en el dashboard
+        filtro_tematica_ok = True
+        if delito_nombre.lower() != "extorsión":
+            print("  Esperando dinámicamente la aplicación del filtro 'Delito'...")
+            filtro_aplicado = False
+            for _ in range(30):
+                body_text = page.locator("body").inner_text()
+                if "Delito" in body_text:
+                    filtro_aplicado = True
+                    break
+                page.wait_for_timeout(500)
+            if filtro_aplicado:
+                print("    [OK] Filtro 'Delito' detectado en el dashboard.")
+            else:
+                print("    [AVISO] No se detectó la etiqueta 'Delito' en la barra de filtros tras 15s.")
+                filtro_tematica_ok = False
+            page.wait_for_timeout(3000)  # Estabilización final
+        else:
+            page.wait_for_timeout(8000)  # Espera fija para Extorsión que no usa el filtro Delito en el dashboard Operativo
         
         # Aplicar filtros usando la función robusta
         aplicar_filtro_qlik(page, "Departamento", "VALLE")
         aplicar_filtro_qlik(page, "Municipio", "JAMUNDI", "JAMUNDÍ")
         
-        print("  Esperando 10 segundos a que se actualicen los gráficos...")
-        page.wait_for_timeout(10000)
+        print("  Esperando 12 segundos a que se actualicen los gráficos...")
+        page.wait_for_timeout(12000)
         
         # Guardar captura específica de la temática
         delito_file_name = f"siedco_{delito_nombre.lower().replace(' ', '_')}.png"
@@ -188,6 +222,11 @@ def extraer_datos_delito(browser, delito_nombre, delito_pattern):
         
         if casos_2025 is None or casos_2026 is None:
             return None, None, "ERROR: Falló parseo de números del DOM"
+            
+        # Validar si el filtro de Delito no se aplicó (retornó totales departamentales/municipales sin filtrar)
+        if delito_nombre.lower() != "extorsión":
+            if not filtro_tematica_ok or (casos_2025 == 308374 and casos_2026 == 1051159):
+                return None, None, "ERROR: Filtro de Delito no se aplicó (se detectaron cifras acumuladas totales)"
             
         print(f"  [OK] Datos extraídos -> {delito_nombre} 2025: {casos_2025}, 2026: {casos_2026}")
         return casos_2025, casos_2026, "OK"
@@ -218,9 +257,19 @@ def main():
         
         for temp in TEMATICAS:
             nombre = temp["nombre"]
+            keywords = temp["keywords"]
             pattern = temp["pattern"]
-            v_25, v_26, estado = extraer_datos_delito(browser, nombre, pattern)
             
+            # Reintento robusto para cada delito (hasta 5 intentos)
+            v_25, v_26, estado = None, None, "ERROR: No iniciado"
+            for intento in range(5):
+                print(f"Intento {intento + 1} para extraer {nombre}...")
+                v_25, v_26, estado = extraer_datos_delito(browser, nombre, keywords, pattern)
+                if estado == "OK":
+                    break
+                print(f"  [AVISO] Falló extracción de {nombre} en intento {intento + 1} (Estado: {estado}). Reintentando en 6s...")
+                time.sleep(6)
+                
             datos_consolidados[nombre] = {
                 "2025": v_25,
                 "2026": v_26,

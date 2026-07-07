@@ -17,38 +17,30 @@ def main():
             page.goto(url, wait_until="networkidle", timeout=60000)
             page.wait_for_timeout(5000)
             
-            # Seleccionar Hurto a personas
-            js_result = page.evaluate("""() => {
+            # Seleccionar Hurto a personas usando JS para buscar la etiqueta y Playwright select_option
+            option_label = page.evaluate("""() => {
                 const sel = document.getElementById('tematicasCombo');
-                if (!sel) return "No select element found";
+                if (!sel) return null;
                 const scope = angular.element(sel).scope();
-                if (!scope) return "No scope found";
-                
-                const optionObj = scope.tematicasCombo.find(item => item.label.includes('Hurto a personas'));
-                if (!optionObj) return "Option not found";
-                
-                const selectedYear = 2026;
-                
-                sel.value = optionObj.value;
-                sel.dispatchEvent(new Event('change'));
-                const selAnio = document.querySelector("select[id$='osCombo']");
-                if (selAnio) {
-                    selAnio.value = selectedYear.toString();
-                    selAnio.dispatchEvent(new Event('change'));
-                }
-                
-                scope.$apply(() => {
-                    scope.tematicaSeleccionada = optionObj;
-                    scope.anioSeleccionado = selectedYear;
-                    scope.getSeleccionesCombos();
+                if (!scope) return null;
+                const kws = ["extorsi"];
+                const optionObj = scope.tematicasCombo.find(item => {
+                    const labelLower = item.label.toLowerCase();
+                    return kws.every(kw => labelLower.includes(kw));
                 });
-                return "SUCCESS";
+                return optionObj ? optionObj.label : null;
             }""")
-            print("Angular result:", js_result)
+            print("Encontrado label del combo:", option_label)
+            if not option_label:
+                raise Exception("No se encontró la temática por keywords")
+                
+            page.select_option("select#tematicasCombo", label=option_label)
+            page.select_option("select[id$='osCombo']", label="2026")
             page.wait_for_timeout(1500)
             
             # Click
-            page.locator(".btn-enter:not([disabled])").first.click()
+            page.locator(".btn-enter").evaluate("el => el.removeAttribute('disabled')")
+            page.locator(".btn-enter").first.click()
             
             # Wait for dashboard
             page.locator(".qv-object-filterpane", has_text="Departamento").first.wait_for(state="visible", timeout=60000)
@@ -60,10 +52,11 @@ def main():
             page.wait_for_timeout(1500)
             dept_search = page.locator("input[placeholder='Buscar en cuadro de lista']:visible").first
             dept_search.fill("VALLE")
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(2000)
             page.locator("[data-testid='listbox.item']", has_text="VALLE").first.click(force=True)
-            page.wait_for_timeout(1000)
-            page.locator(".actions-toolbar-confirm:visible").first.click(force=True)
+            page.wait_for_timeout(1500)
+            confirm_btn = page.locator(".qs-actions-confirm:visible, .qv-confirm-button:visible, button[title*='Confirmar']:visible, .actions-toolbar-confirm:visible").first
+            confirm_btn.click(force=True)
             page.wait_for_timeout(4500)
             
             # Seleccionar Jamundí
@@ -72,11 +65,16 @@ def main():
             page.wait_for_timeout(1500)
             muni_search = page.locator("input[placeholder='Buscar en cuadro de lista']:visible").first
             muni_search.fill("JAMUNDI")
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(2000)
             page.locator("[data-testid='listbox.item']", has_text="JAMUNDÍ").first.click(force=True)
-            page.wait_for_timeout(1000)
-            page.locator(".actions-toolbar-confirm:visible").first.click(force=True)
-            page.wait_for_timeout(8000)
+            page.wait_for_timeout(1500)
+            confirm_btn = page.locator(".qs-actions-confirm:visible, .qv-confirm-button:visible, button[title*='Confirmar']:visible, .actions-toolbar-confirm:visible").first
+            confirm_btn.click(force=True)
+            page.wait_for_timeout(10000)
+            
+            # Guardar captura de pantalla para inspeccionar visualmente
+            page.screenshot(path="siedco_hurto_a_personas_debug.png", full_page=True)
+            print("Captura guardada en: siedco_hurto_a_personas_debug.png")
             
             body_text = page.locator("body").inner_text()
             print("=== BODY TEXT ===")
@@ -87,6 +85,6 @@ def main():
             print("Error:", e)
         finally:
             browser.close()
-
+ 
 if __name__ == "__main__":
     main()
