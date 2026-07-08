@@ -229,10 +229,12 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
         if casos_2025 is None or casos_2026 is None:
             return None, None, "ERROR: Falló parseo de números del DOM"
             
-        # Validar si el filtro de Delito no se aplicó (retornó totales departamentales/municipales sin filtrar)
-        if tipo_tematica == "delito":
-            if not filtro_tematica_ok or (casos_2025 == 308374 and casos_2026 == 1051159):
-                return None, None, "ERROR: Filtro de Delito no se aplicó (se detectaron cifras acumuladas totales)"
+        # Validar si los filtros de Departamento/Municipio no se aplicaron (se detectaron cifras acumuladas totales)
+        if casos_2025 == 308374 and casos_2026 == 1051159:
+            return None, None, "ERROR: Filtros de Departamento/Municipio no se aplicaron (se detectaron cifras acumuladas totales)"
+            
+        if tipo_tematica == "delito" and not filtro_tematica_ok:
+            return None, None, "ERROR: Filtro de Delito no se aplicó"
             
         print(f"  [OK] Datos extraídos -> {delito_nombre} 2025: {casos_2025}, 2026: {casos_2026}")
         return casos_2025, casos_2026, "OK"

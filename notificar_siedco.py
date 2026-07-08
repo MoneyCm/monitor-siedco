@@ -287,9 +287,9 @@ if __name__ == "__main__":
         "Hurto motocicletas": {"2025": 68, "2026": 92, "estado": "OK", "tipo": "delito"},
         "Lesiones personales": {"2025": 171, "2026": 151, "estado": "OK", "tipo": "delito"},
         "Violencia intrafamiliar": {"2025": 111, "2026": 139, "estado": "OK", "tipo": "delito"},
-        "Capturas": {"2025": 84, "2026": 95, "estado": "OK", "tipo": "operativo"},
-        "Automotores recuperados": {"2025": 12, "2026": 15, "estado": "OK", "tipo": "operativo"},
-        "Motocicletas recuperadas": {"2025": 34, "2026": 42, "estado": "OK", "tipo": "operativo"}
+        "Capturas": {"2025": 238, "2026": 157, "estado": "OK", "tipo": "operativo"},
+        "Automotores recuperados": {"2025": 16, "2026": 12, "estado": "OK", "tipo": "operativo"},
+        "Motocicletas recuperadas": {"2025": 61, "2026": 50, "estado": "OK", "tipo": "operativo"}
     }
     TEST_IMG = Path(__file__).resolve().parent / "siedco_homicidios.png"
     if not TEST_IMG.exists():
