@@ -57,6 +57,13 @@ def extraer_casos(text, delito_pattern, anio):
             print(f"[ERROR] No se pudo convertir el valor '{valor_str}' a entero para {delito_pattern} en {anio}.")
     return None
 
+def extraer_fecha_corte(text, anio):
+    patron = rf"Desde:\s*01/01/{anio}\s*Hasta:\s*(\d{{2}}/\d{{2}}/\d{{4}})"
+    match = re.search(patron, text, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return None
+
 def aplicar_filtro_qlik(page, panel_titulo, valor_busqueda, valor_confirmar=None):
     if not valor_confirmar:
         valor_confirmar = valor_busqueda
@@ -223,21 +230,21 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
         
         body_text = page.locator("body").inner_text()
         
-        casos_2025 = extraer_casos(body_text, delito_pattern, 2025)
-        casos_2026 = extraer_casos(body_text, delito_pattern, 2026)
+        fecha_2025 = extraer_fecha_corte(body_text, 2025)
+        fecha_2026 = extraer_fecha_corte(body_text, 2026)
         
         if casos_2025 is None or casos_2026 is None:
-            return None, None, "ERROR: Falló parseo de números del DOM"
+            return None, None, None, None, "ERROR: Falló parseo de números del DOM"
             
         # Validar si los filtros de Departamento/Municipio no se aplicaron (se detectaron cifras acumuladas totales)
         if casos_2025 == 308374 and casos_2026 == 1051159:
-            return None, None, "ERROR: Filtros de Departamento/Municipio no se aplicaron (se detectaron cifras acumuladas totales)"
+            return None, None, None, None, "ERROR: Filtros de Departamento/Municipio no se aplicaron (se detectaron cifras acumuladas totales)"
             
         if tipo_tematica == "delito" and not filtro_tematica_ok:
-            return None, None, "ERROR: Filtro de Delito no se aplicó"
+            return None, None, None, None, "ERROR: Filtro de Delito no se aplicó"
             
-        print(f"  [OK] Datos extraídos -> {delito_nombre} 2025: {casos_2025}, 2026: {casos_2026}")
-        return casos_2025, casos_2026, "OK"
+        print(f"  [OK] Datos extraídos -> {delito_nombre} 2025: {casos_2025} ({fecha_2025}), 2026: {casos_2026} ({fecha_2026})")
+        return casos_2025, casos_2026, fecha_2025, fecha_2026, "OK"
 
     except Exception as e:
         print(f"  [ERROR] Ocurrió una excepción durante el procesamiento de {delito_nombre}: {e}")
@@ -247,7 +254,7 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
             print(f"  [OK] Captura de pantalla de error guardada en: {err_img.name}")
         except Exception:
             pass
-        return None, None, f"ERROR: Excepción en navegador ({str(e)[:60]})"
+        return None, None, None, None, f"ERROR: Excepción en navegador ({str(e)[:60]})"
     finally:
         context.close()
 
@@ -270,10 +277,10 @@ def main():
             tipo = temp["tipo"]
             
             # Reintento robusto para cada delito (hasta 5 intentos)
-            v_25, v_26, estado = None, None, "ERROR: No iniciado"
+            v_25, v_26, f_25, f_26, estado = None, None, None, None, "ERROR: No iniciado"
             for intento in range(5):
                 print(f"Intento {intento + 1} para extraer {nombre}...")
-                v_25, v_26, estado = extraer_datos_delito(browser, nombre, keywords, pattern, tipo)
+                v_25, v_26, f_25, f_26, estado = extraer_datos_delito(browser, nombre, keywords, pattern, tipo)
                 if estado == "OK":
                     break
                 print(f"  [AVISO] Falló extracción de {nombre} en intento {intento + 1} (Estado: {estado}). Reintentando en 6s...")
@@ -282,6 +289,8 @@ def main():
             datos_consolidados[nombre] = {
                 "2025": v_25,
                 "2026": v_26,
+                "fecha_corte_2025": f_25,
+                "fecha_corte_2026": f_26,
                 "estado": estado,
                 "tipo": tipo
             }

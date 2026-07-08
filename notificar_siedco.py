@@ -20,6 +20,20 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
     hoy = datetime.now()
     fecha_hoy = hoy.strftime("%d/%m/%Y %H:%M")
     
+    # Encontrar la fecha más reciente (fecha del último registro global)
+    fechas_2026 = []
+    for d_name, d_vals in datos_delitos.items():
+        if d_vals.get("estado") == "OK" and d_vals.get("fecha_corte_2026"):
+            fechas_2026.append(d_vals.get("fecha_corte_2026"))
+            
+    fecha_ultimo_registro = "N/A"
+    if fechas_2026:
+        try:
+            fechas_parsed = sorted(fechas_2026, key=lambda x: datetime.strptime(x, "%d/%m/%Y"), reverse=True)
+            fecha_ultimo_registro = fechas_parsed[0]
+        except Exception:
+            fecha_ultimo_registro = fechas_2026[0]
+
     # Construir las filas de la tabla de delitos en HTML
     filas_delitos_html = ""
     filas_operativos_html = ""
@@ -35,12 +49,24 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
         valores = datos_delitos[delito]
         tipo_tematica = valores.get("tipo", "delito")
         estado_delito = valores.get("estado", "OK")
+        fecha_corte_2026 = valores.get("fecha_corte_2026")
+        
+        # Subtexto de fecha del último caso
+        subtexto_fecha = ""
+        if fecha_corte_2026:
+            subtexto_fecha = f"""
+            <div style="font-size: 10px; font-weight: normal; color: #888899; margin-top: 2px;">
+              Último caso: {fecha_corte_2026}
+            </div>
+            """
         
         # Si el delito falló en la recolección, se pinta una fila de error destacada
         if estado_delito != "OK":
             fila_err = f"""
             <tr style="border-bottom: 1px solid #eef0f7; background-color: #fffafb;">
-              <td style="padding: 10px 12px; font-size: 13px; font-weight: bold; color: #1A1A2E;">{delito}</td>
+              <td style="padding: 10px 12px; font-size: 13px; font-weight: bold; color: #1A1A2E;">
+                {delito}
+              </td>
               <td style="padding: 10px 12px; font-size: 13px; text-align: center; color: #a1a3b5;">—</td>
               <td style="padding: 10px 12px; font-size: 13px; text-align: center; color: #a1a3b5;">—</td>
               <td style="padding: 10px 12px; font-size: 13px; text-align: center; color: #a1a3b5;">—</td>
@@ -95,7 +121,10 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
             
         fila_ok = f"""
         <tr style="border-bottom: 1px solid #eef0f7;">
-          <td style="padding: 10px 12px; font-size: 13px; font-weight: bold; color: #1A1A2E;">{delito}</td>
+          <td style="padding: 10px 12px; font-size: 13px; font-weight: bold; color: #1A1A2E;">
+            {delito}
+            {subtexto_fecha}
+          </td>
           <td style="padding: 10px 12px; font-size: 13px; text-align: center; color: #606175;">{v_2025}</td>
           <td style="padding: 10px 12px; font-size: 13px; text-align: center; font-weight: bold; color: #281FD0;">{v_2026}</td>
           <td style="padding: 10px 12px; font-size: 13px; text-align: center; font-weight: bold; color: {color};">{diff_str}</td>
@@ -146,7 +175,7 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
           
           <h2 style="color: #281FD0; font-size: 18px; margin: 15px 0 8px;">Consolidado de Criminalidad y Convivencia</h2>
           <p style="color: #606175; font-size: 13px; margin: 0 0 20px; line-height: 1.5;">
-            Se ha realizado la descarga y comparación en tiempo real de los principales indicadores delictivos oficiales registrados en el portal <b>SIEDCO</b> para el municipio de <b>Jamundí</b>. Cifras acumuladas al corte del periodo de consulta:
+            Se ha realizado la descarga y comparación en tiempo real de los principales indicadores delictivos oficiales registrados en el portal <b>SIEDCO</b> para el municipio de <b>Jamundí</b> (corte global de información: <b>{fecha_ultimo_registro}</b>). Cifras acumuladas al corte del periodo de consulta:
           </p>
           
           {novedades_box_html}
@@ -279,17 +308,17 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
 if __name__ == "__main__":
     # Datos de prueba para correr notificar_siedco.py directamente con errores
     test_data = {
-        "Homicidios": {"2025": 58, "2026": 61, "estado": "OK", "tipo": "delito"},
-        "Hurto a personas": {"2025": 232, "2026": 197, "estado": "OK", "tipo": "delito"},
-        "Hurto a residencias": {"2025": 31, "2026": 35, "estado": "OK", "tipo": "delito"},
-        "Hurto a comercio": {"2025": 32, "2026": 31, "estado": "OK", "tipo": "delito"},
-        "Hurto automotores": {"2025": 25, "2026": 36, "estado": "OK", "tipo": "delito"},
-        "Hurto motocicletas": {"2025": 68, "2026": 92, "estado": "OK", "tipo": "delito"},
-        "Lesiones personales": {"2025": 171, "2026": 151, "estado": "OK", "tipo": "delito"},
-        "Violencia intrafamiliar": {"2025": 111, "2026": 139, "estado": "OK", "tipo": "delito"},
-        "Capturas": {"2025": 238, "2026": 157, "estado": "OK", "tipo": "operativo"},
-        "Automotores recuperados": {"2025": 16, "2026": 12, "estado": "OK", "tipo": "operativo"},
-        "Motocicletas recuperadas": {"2025": 61, "2026": 50, "estado": "OK", "tipo": "operativo"}
+        "Homicidios": {"2025": 58, "2026": 61, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "delito"},
+        "Hurto a personas": {"2025": 232, "2026": 197, "fecha_corte_2025": "12/06/2025", "fecha_corte_2026": "12/06/2026", "estado": "OK", "tipo": "delito"},
+        "Hurto a residencias": {"2025": 31, "2026": 35, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "delito"},
+        "Hurto a comercio": {"2025": 32, "2026": 31, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "delito"},
+        "Hurto automotores": {"2025": 25, "2026": 36, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "delito"},
+        "Hurto motocicletas": {"2025": 68, "2026": 92, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "delito"},
+        "Lesiones personales": {"2025": 171, "2026": 151, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "delito"},
+        "Violencia intrafamiliar": {"2025": 111, "2026": 139, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "delito"},
+        "Capturas": {"2025": 238, "2026": 157, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "operativo"},
+        "Automotores recuperados": {"2025": 16, "2026": 12, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "operativo"},
+        "Motocicletas recuperadas": {"2025": 61, "2026": 50, "fecha_corte_2025": "11/06/2025", "fecha_corte_2026": "11/06/2026", "estado": "OK", "tipo": "operativo"}
     }
     TEST_IMG = Path(__file__).resolve().parent / "siedco_homicidios.png"
     if not TEST_IMG.exists():
