@@ -146,7 +146,7 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
         }}""")
         
         if not option_label:
-            return None, None, f"ERROR: No se encontró etiqueta para temática {delito_nombre}"
+            return None, None, None, None, f"ERROR: No se encontró etiqueta para temática {delito_nombre}"
             
         print(f"  Seleccionando temática '{option_label}'...")
         page.select_option("select#tematicasCombo", label=option_label)
@@ -229,6 +229,9 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
         print(f"  [OK] Captura de pantalla guardada en: {delito_file_name}")
         
         body_text = page.locator("body").inner_text()
+        
+        casos_2025 = extraer_casos(body_text, delito_pattern, 2025)
+        casos_2026 = extraer_casos(body_text, delito_pattern, 2026)
         
         fecha_2025 = extraer_fecha_corte(body_text, 2025)
         fecha_2026 = extraer_fecha_corte(body_text, 2026)
