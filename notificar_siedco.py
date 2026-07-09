@@ -13,6 +13,16 @@ from pathlib import Path
 import hashlib
 from generar_reporte_siedco import PDFGeneratorSIEDCO
 
+# Cargar variables de entorno desde un archivo .env si existe
+env_path = Path(__file__).resolve().parent / ".env"
+if env_path.exists():
+    with open(env_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, val = line.split("=", 1)
+                os.environ[key.strip()] = val.strip()
+
 # Configuración de credenciales y destino
 GMAIL_USER = os.environ.get("GMAIL_USER")
 GMAIL_PASS = os.environ.get("GMAIL_PASS") or os.environ.get("GMAIL_APP_PASSWORD")
