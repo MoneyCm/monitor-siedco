@@ -253,6 +253,8 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
             <img src="cid:dashboard_img" alt="Dashboard SIEDCO" style="width: 100%; height: auto; display: block;" />
           </div>
           
+          {{map_html}}
+          
           <!-- Caja de Integridad del Reporte -->
           <div style="margin-top: 20px; padding: 12px 16px; background: #fffde7; border-left: 4px solid #FFE000; font-size: 11px; color: #555566; border-radius: 4px;">
             <b>Integridad del Reporte (Archivo PDF Adjunto):</b><br>
@@ -288,11 +290,28 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
     </html>
     """
     
+    # Generar bloque HTML del mapa si existe
+    map_image_path = Path("siedco_mapa_homicidios.png")
+    map_html = ""
+    if map_image_path.exists():
+        map_html = f"""
+          <!-- Mapa de Calor de Georreferenciación -->
+          <div style="margin: 20px 0 15px; border: 1px solid #e1e2eb; border-radius: 6px; overflow: hidden; background: #fff;">
+            <div style="background: #f8f9fc; padding: 8px 12px; font-size: 11px; color: #606175; border-bottom: 1px solid #e1e2eb; font-weight: bold;">
+              📍 Mapa de Calor y Distribución Espacial de Casos (Homicidios Jamundí):
+            </div>
+            <img src="cid:mapa_img" alt="Mapa de Calor SIEDCO" style="width: 100%; height: auto; display: block;" />
+          </div>
+        """
+    cuerpo_html = cuerpo_html.replace("{map_html}", map_html)
+
     # 1. Guardar siempre una copia local de prueba del HTML para que el usuario la visualice directamente
     prueba_path = Path("reporte_siedco_prueba.html")
     # Para la visualización local en navegador sin servidor, reemplazamos el cid por la ruta relativa
     html_local = cuerpo_html.replace("cid:escudo_img", "escudo_jamundi.png")
     html_local = html_local.replace("cid:dashboard_img", representative_image_path.name)
+    if map_image_path.exists():
+        html_local = html_local.replace("cid:mapa_img", map_image_path.name)
     
     with open(prueba_path, "w", encoding="utf-8") as pf:
         pf.write(html_local)
@@ -340,6 +359,26 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
         msg.attach(part)
     else:
         print(f"Advertencia: No se encontró la captura en {representative_image_path} para adjuntar.")
+        
+    # Incrustar y adjuntar la imagen del mapa de calor si existe (CID)
+    if map_image_path.exists():
+        try:
+            with open(map_image_path, "rb") as map_file:
+                mime_map = MIMEImage(map_file.read())
+                mime_map.add_header("Content-ID", "<mapa_img>")
+                mime_map.add_header("Content-Disposition", "inline", filename=map_image_path.name)
+                msg.attach(mime_map)
+                
+            # Adjuntarla como archivo ordinario
+            with open(map_image_path, "rb") as f:
+                part_map = MIMEBase("application", "octet-stream")
+                part_map.set_payload(f.read())
+            encoders.encode_base64(part_map)
+            part_map.add_header("Content-Disposition", f"attachment; filename={map_image_path.name}")
+            msg.attach(part_map)
+            print(f"[OK] Mapa de calor adjuntado correctamente al correo: {map_image_path.name}")
+        except Exception as map_att_err:
+            print(f"Error adjuntando mapa de calor al correo: {map_att_err}")
         
     # Adjuntar PDF
     if pdf_path.exists():

@@ -228,6 +228,32 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
         page.screenshot(path=str(img_path), full_page=True)
         print(f"  [OK] Captura de pantalla guardada en: {delito_file_name}")
         
+        # Capturar mapa de calor (Ruta B)
+        try:
+            print("  Buscando y capturando mapa de calor de Qlik...")
+            map_loc = None
+            for selector in [
+                ".qv-object:has-text('Distribución de Temática')",
+                ".qv-object:has-text('Mapa')",
+                ".qv-object-map"
+            ]:
+                loc = page.locator(selector).first
+                if loc.is_visible():
+                    map_loc = loc
+                    break
+            
+            if map_loc:
+                map_loc.scroll_into_view_if_needed()
+                page.wait_for_timeout(3000)  # Espera para renderizar los tiles del mapa
+                map_file_name = f"siedco_mapa_{delito_nombre.lower().replace(' ', '_')}.png"
+                map_img_path = BASE_DIR / map_file_name
+                map_loc.screenshot(path=str(map_img_path))
+                print(f"    [OK] Mapa de calor guardado en: {map_file_name}")
+            else:
+                print("    [AVISO] No se encontró el objeto de mapa de calor en el panel.")
+        except Exception as map_err:
+            print(f"    [AVISO] Error al capturar mapa de calor: {map_err}")
+        
         body_text = page.locator("body").inner_text()
         
         casos_2025 = extraer_casos(body_text, delito_pattern, 2025)

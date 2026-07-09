@@ -278,6 +278,16 @@ class PDFGeneratorSIEDCO:
             ]))
             elements.append(Spacer(1, 10))
             
+        # --- IMAGEN DEL MAPA DE CALOR DE SIEDCO (HOMICIDIOS) ---
+        mapa_path = Path("siedco_mapa_homicidios.png")
+        if mapa_path.exists():
+            img_mapa = Image(str(mapa_path), 16.5*cm, 9.0*cm)
+            elements.append(KeepTogether([
+                Paragraph("Distribución Geográfica y Mapa de Calor (Homicidios)", style_section_title),
+                img_mapa
+            ]))
+            elements.append(Spacer(1, 10))
+            
         # --- BLOQUE DE FIRMA Y PIE DE PÁGINA ---
         style_firma = ParagraphStyle('Firm', parent=styles['Normal'], fontSize=9, textColor=colors.black, alignment=TA_CENTER, leading=13)
         firma_elements = [
