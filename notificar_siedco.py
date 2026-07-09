@@ -290,19 +290,46 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
     </html>
     """
     
-    # Generar bloque HTML del mapa si existe
-    map_image_path = Path("siedco_mapa_homicidios.png")
-    map_html = ""
-    if map_image_path.exists():
-        map_html = f"""
-          <!-- Mapa de Calor de Georreferenciación -->
-          <div style="margin: 20px 0 15px; border: 1px solid #e1e2eb; border-radius: 6px; overflow: hidden; background: #fff;">
-            <div style="background: #f8f9fc; padding: 8px 12px; font-size: 11px; color: #606175; border-bottom: 1px solid #e1e2eb; font-weight: bold;">
-              📍 Mapa de Calor y Distribución Espacial de Casos (Homicidios Jamundí):
-            </div>
-            <img src="cid:mapa_img" alt="Mapa de Calor SIEDCO" style="width: 100%; height: auto; display: block;" />
-          </div>
-        """
+    # Seleccionar top 3 delitos más críticos para mapas dinámicos
+    delitos_con_datos = [
+        (d, v) for d, v in datos_delitos.items() 
+        if v.get("tipo") == "delito" and v.get("estado") == "OK"
+    ]
+    
+    delitos_criticos = []
+    homicidios_item = next(((d, v) for d, v in delitos_con_datos if "homicidio" in d.lower()), None)
+    if homicidios_item:
+        delitos_criticos.append(homicidios_item[0])
+        delitos_con_datos.remove(homicidios_item)
+        
+    otros_ordenados = sorted(
+        delitos_con_datos, 
+        key=lambda x: x[1].get("2026", 0) or 0, 
+        reverse=True
+    )
+    for item in otros_ordenados[:2]:
+        delitos_criticos.append(item[0])
+
+    map_html_list = []
+    mapas_a_adjuntar = []  # Lista de tuplas (Path, Content-ID)
+    
+    for idx, delito_nombre in enumerate(delitos_criticos):
+        map_file_name = f"siedco_mapa_{delito_nombre.lower().replace(' ', '_')}.png"
+        map_path = Path(map_file_name)
+        if map_path.exists():
+            cid = f"mapa_img_{idx}"
+            mapas_a_adjuntar.append((map_path, cid))
+            map_html_list.append(f"""
+              <!-- Mapa de Calor: {delito_nombre} -->
+              <div style="margin: 20px 0 15px; border: 1px solid #e1e2eb; border-radius: 6px; overflow: hidden; background: #fff;">
+                <div style="background: #f8f9fc; padding: 8px 12px; font-size: 11px; color: #281FD0; border-bottom: 1px solid #e1e2eb; font-weight: bold;">
+                  📍 Mapa de Calor y Distribución Espacial: {delito_nombre} (Jamundí)
+                </div>
+                <img src="cid:{cid}" alt="Mapa de Calor {delito_nombre}" style="width: 100%; height: auto; display: block;" />
+              </div>
+            """)
+            
+    map_html = "\n".join(map_html_list)
     cuerpo_html = cuerpo_html.replace("{map_html}", map_html)
 
     # 1. Guardar siempre una copia local de prueba del HTML para que el usuario la visualice directamente
@@ -310,8 +337,8 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
     # Para la visualización local en navegador sin servidor, reemplazamos el cid por la ruta relativa
     html_local = cuerpo_html.replace("cid:escudo_img", "escudo_jamundi.png")
     html_local = html_local.replace("cid:dashboard_img", representative_image_path.name)
-    if map_image_path.exists():
-        html_local = html_local.replace("cid:mapa_img", map_image_path.name)
+    for map_path, cid in mapas_a_adjuntar:
+        html_local = html_local.replace(f"cid:{cid}", map_path.name)
     
     with open(prueba_path, "w", encoding="utf-8") as pf:
         pf.write(html_local)
@@ -360,25 +387,25 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
     else:
         print(f"Advertencia: No se encontró la captura en {representative_image_path} para adjuntar.")
         
-    # Incrustar y adjuntar la imagen del mapa de calor si existe (CID)
-    if map_image_path.exists():
+    # Incrustar y adjuntar los mapas de calor dinámicos (CID)
+    for map_path, cid in mapas_a_adjuntar:
         try:
-            with open(map_image_path, "rb") as map_file:
+            with open(map_path, "rb") as map_file:
                 mime_map = MIMEImage(map_file.read())
-                mime_map.add_header("Content-ID", "<mapa_img>")
-                mime_map.add_header("Content-Disposition", "inline", filename=map_image_path.name)
+                mime_map.add_header("Content-ID", f"<{cid}>")
+                mime_map.add_header("Content-Disposition", "inline", filename=map_path.name)
                 msg.attach(mime_map)
                 
             # Adjuntarla como archivo ordinario
-            with open(map_image_path, "rb") as f:
+            with open(map_path, "rb") as f:
                 part_map = MIMEBase("application", "octet-stream")
                 part_map.set_payload(f.read())
             encoders.encode_base64(part_map)
-            part_map.add_header("Content-Disposition", f"attachment; filename={map_image_path.name}")
+            part_map.add_header("Content-Disposition", f"attachment; filename={map_path.name}")
             msg.attach(part_map)
-            print(f"[OK] Mapa de calor adjuntado correctamente al correo: {map_image_path.name}")
+            print(f"[OK] Mapa de calor adjuntado correctamente al correo: {map_path.name} (CID: {cid})")
         except Exception as map_att_err:
-            print(f"Error adjuntando mapa de calor al correo: {map_att_err}")
+            print(f"Error adjuntando mapa de calor {map_path.name} al correo: {map_att_err}")
         
     # Adjuntar PDF
     if pdf_path.exists():

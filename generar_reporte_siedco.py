@@ -278,15 +278,38 @@ class PDFGeneratorSIEDCO:
             ]))
             elements.append(Spacer(1, 10))
             
-        # --- IMAGEN DEL MAPA DE CALOR DE SIEDCO (HOMICIDIOS) ---
-        mapa_path = Path("siedco_mapa_homicidios.png")
-        if mapa_path.exists():
-            img_mapa = Image(str(mapa_path), 16.5*cm, 9.0*cm)
-            elements.append(KeepTogether([
-                Paragraph("Distribución Geográfica y Mapa de Calor (Homicidios)", style_section_title),
-                img_mapa
-            ]))
-            elements.append(Spacer(1, 10))
+        # --- MAPAS DE CALOR DINÁMICOS DE DELITOS CRÍTICOS (OPCION A) ---
+        delitos_con_datos = [
+            (d, v) for d, v in datos_delitos.items() 
+            if v.get("tipo") == "delito" and v.get("estado") == "OK"
+        ]
+        
+        delitos_criticos = []
+        homicidios_item = next(((d, v) for d, v in delitos_con_datos if "homicidio" in d.lower()), None)
+        if homicidios_item:
+            delitos_criticos.append(homicidios_item[0])
+            delitos_con_datos.remove(homicidios_item)
+            
+        otros_ordenados = sorted(
+            delitos_con_datos, 
+            key=lambda x: x[1].get("2026", 0) or 0, 
+            reverse=True
+        )
+        for item in otros_ordenados[:2]:
+            delitos_criticos.append(item[0])
+            
+        if delitos_criticos:
+            elements.append(Paragraph("Distribución Espacial y Mapas de Calor Críticos", style_section_title))
+            for delito_nombre in delitos_criticos:
+                map_file_name = f"siedco_mapa_{delito_nombre.lower().replace(' ', '_')}.png"
+                mapa_path = Path(map_file_name)
+                if mapa_path.exists():
+                    img_mapa = Image(str(mapa_path), 16.5*cm, 8.2*cm)
+                    elements.append(KeepTogether([
+                        Paragraph(f"<b>Mapa de Calor: {delito_nombre}</b>", ParagraphStyle('SubMap', parent=styles['Normal'], fontSize=9.5, textColor=colors.HexColor('#281FD0'), spaceBefore=6, spaceAfter=4)),
+                        img_mapa,
+                        Spacer(1, 10)
+                    ]))
             
         # --- BLOQUE DE FIRMA Y PIE DE PÁGINA ---
         style_firma = ParagraphStyle('Firm', parent=styles['Normal'], fontSize=9, textColor=colors.black, alignment=TA_CENTER, leading=13)
