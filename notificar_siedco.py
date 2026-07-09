@@ -10,6 +10,8 @@ from email.mime.base import MIMEBase
 from email import encoders
 from datetime import datetime
 from pathlib import Path
+import hashlib
+from generar_reporte_siedco import PDFGeneratorSIEDCO
 
 # Configuración de credenciales y destino
 GMAIL_USER = os.environ.get("GMAIL_USER")
@@ -19,6 +21,22 @@ EMAIL_DEST = os.environ.get("EMAIL_DEST") or GMAIL_USER
 def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_path: Path):
     hoy = datetime.now()
     fecha_hoy = hoy.strftime("%d/%m/%Y %H:%M")
+    
+    # Generar Reporte PDF
+    pdf_path = Path("reporte_siedco_jamundi.pdf")
+    sha_pdf = "N/A"
+    try:
+        gen = PDFGeneratorSIEDCO()
+        gen.generar(datos_delitos, str(pdf_path), str(escudo_path))
+        
+        # Calcular SHA256 del PDF
+        sha256_hash = hashlib.sha256()
+        with open(pdf_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        sha_pdf = sha256_hash.hexdigest()
+    except Exception as pdf_err:
+        print(f"Error generando PDF o calculando SHA256: {pdf_err}")
     
     # Encontrar la fecha más reciente (fecha del último registro global)
     fechas_2026 = []
@@ -225,9 +243,25 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
             <img src="cid:dashboard_img" alt="Dashboard SIEDCO" style="width: 100%; height: auto; display: block;" />
           </div>
           
+          <!-- Caja de Integridad del Reporte -->
+          <div style="margin-top: 20px; padding: 12px 16px; background: #fffde7; border-left: 4px solid #FFE000; font-size: 11px; color: #555566; border-radius: 4px;">
+            <b>Integridad del Reporte (Archivo PDF Adjunto):</b><br>
+            SHA256 Checksum: <code style="font-size: 10px; font-family: monospace; color: #281FD0;">{sha_pdf}</code>
+          </div>
+          
           <p style="font-size: 11px; color: #a1a3b5; margin-top: 15px; text-align: center; font-style: italic;">
             * Nota: Las cifras representan el acumulado del año actual frente al mismo periodo del año anterior para fines comparativos del Observatorio.
           </p>
+          
+          <!-- Firma Profesional del Elaborador -->
+          <div style="margin-top: 30px; border-top: 1px solid #e1e2eb; padding-top: 15px;">
+            <p style="margin: 0; font-size: 13px; font-weight: bold; color: #281FD0;">Elaborado por:</p>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #444455; line-height: 1.4;">
+              <b>César Alfonso Forero Molano</b><br>
+              Profesional Secretaría de Seguridad y Convivencia<br>
+              Alcaldía de Jamundí
+            </p>
+          </div>
         </div>
         
         <!-- Pie de Página -->
@@ -296,6 +330,22 @@ def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_p
         msg.attach(part)
     else:
         print(f"Advertencia: No se encontró la captura en {representative_image_path} para adjuntar.")
+        
+    # Adjuntar PDF
+    if pdf_path.exists():
+        try:
+            with open(pdf_path, "rb") as f_pdf:
+                part_pdf = MIMEBase("application", "octet-stream")
+                part_pdf.set_payload(f_pdf.read())
+            encoders.encode_base64(part_pdf)
+            filename_pdf = f"Bol_SIEDCO_Jamundi_{datetime.now().strftime('%Y%m%d')}.pdf"
+            part_pdf.add_header("Content-Disposition", f"attachment; filename={filename_pdf}")
+            msg.attach(part_pdf)
+            print(f"[OK] Reporte PDF adjuntado correctamente al correo: {filename_pdf}")
+        except Exception as att_err:
+            print(f"Error adjuntando el reporte PDF al correo: {att_err}")
+    else:
+        print(f"Advertencia: No se encontró el reporte PDF en {pdf_path} para adjuntar.")
 
     # Conectar al SMTP SSL de Gmail y enviar
     lista_destinatarios = [email.strip() for email in EMAIL_DEST.split(",") if email.strip()]
