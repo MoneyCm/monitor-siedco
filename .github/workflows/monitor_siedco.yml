@@ -37,6 +37,6 @@ jobs:
       - name: Ejecutar Monitor SIEDCO
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS || secrets.GMAIL_APP_PASSWORD }}
           EMAIL_DEST: ${{ secrets.EMAIL_DEST }}
         run: python monitor_siedco.py

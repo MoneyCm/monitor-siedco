@@ -15,7 +15,7 @@ from generar_reporte_siedco import PDFGeneratorSIEDCO
 
 # Configuración de credenciales y destino
 GMAIL_USER = os.environ.get("GMAIL_USER")
-GMAIL_PASS = os.environ.get("GMAIL_PASS")
+GMAIL_PASS = os.environ.get("GMAIL_PASS") or os.environ.get("GMAIL_APP_PASSWORD")
 EMAIL_DEST = os.environ.get("EMAIL_DEST") or GMAIL_USER
 
 def enviar_alerta(datos_delitos: dict, representative_image_path: Path, escudo_path: Path):

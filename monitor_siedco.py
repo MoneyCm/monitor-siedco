@@ -338,9 +338,13 @@ def main():
                 coincide_todo = False
                 break
                 
-        if coincide_todo:
+        es_manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+        if coincide_todo and not es_manual:
             print("[OK] No se detectaron cambios numéricos ni de estado en ningún delito. Se omite la alerta.")
             hay_cambio = False
+        elif es_manual:
+            print("[INFO] Ejecución manual (workflow_dispatch) detectada. Se fuerza el envío de la alerta por correo.")
+            hay_cambio = True
     else:
         print("[INFO] No existe un registro anterior completo. Se disparará alerta inicial.")
         
