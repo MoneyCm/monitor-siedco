@@ -214,6 +214,12 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
             page.wait_for_timeout(3000)  # Estabilización final
         else:
             page.wait_for_timeout(8000)  # Espera fija para Operativos que no usan el filtro Delito
+            # Verificación adicional: asegurar que los filtros estén listos
+            try:
+                page.locator(".qv-object-filterpane", has_text="Departamento").first.wait_for(state="visible", timeout=15000)
+                print("    [OK] Panel de filtros de Departamento visible para Operativo.")
+            except Exception:
+                print("    [AVISO] Panel de Departamento no visible tras espera adicional para Operativo.")
         
         # Aplicar filtros usando la función robusta
         aplicar_filtro_qlik(page, "Departamento", "VALLE")
@@ -268,6 +274,20 @@ def extraer_datos_delito(browser, delito_nombre, delito_keywords, delito_pattern
         # Validar si los filtros de Departamento/Municipio no se aplicaron (se detectaron cifras acumuladas totales)
         if casos_2025 == 308374 and casos_2026 == 1051159:
             return None, None, None, None, "ERROR: Filtros de Departamento/Municipio no se aplicaron (se detectaron cifras acumuladas totales)"
+        
+        # Validación de magnitud: un municipio como Jamundí no debería tener más de 5,000 casos en ninguna temática por año
+        MAX_RAZONABLE = 5000
+        if casos_2025 > MAX_RAZONABLE or casos_2026 > MAX_RAZONABLE:
+            print(f"  [ERROR] Valores absurdos detectados para {delito_nombre}: 2025={casos_2025:,}, 2026={casos_2026:,} (máx razonable: {MAX_RAZONABLE:,})")
+            print(f"          Esto indica que los filtros de Departamento/Municipio no se aplicaron correctamente.")
+            return None, None, None, None, f"ERROR: Cifras fuera de rango municipal (2025={casos_2025:,}, 2026={casos_2026:,})"
+        
+        # Verificar que los filtros de Qlik realmente se aplicaron mirando el body text
+        body_upper = body_text.upper()
+        filtro_dept_ok = "VALLE" in body_upper and ("JAMUNDI" in body_upper or "JAMUNDÍ" in body_upper)
+        if not filtro_dept_ok:
+            print(f"  [ERROR] No se detectó VALLE/JAMUNDÍ en el DOM. Los filtros de Qlik no están activos.")
+            return None, None, None, None, "ERROR: Filtros geográficos no confirmados en DOM"
             
         if tipo_tematica == "delito" and not filtro_tematica_ok:
             return None, None, None, None, "ERROR: Filtro de Delito no se aplicó"
