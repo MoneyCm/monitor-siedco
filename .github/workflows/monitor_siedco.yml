@@ -5,6 +5,12 @@ on:
     # Contraste mensual posterior al corte oficial: dia 18, 07:53 America/Bogota.
     - cron: "53 12 18 * *"
   workflow_dispatch:
+    inputs:
+      notify:
+        description: "Forzar correo aunque las cifras no hayan cambiado"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   monitor:
@@ -48,6 +54,7 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_PASS: ${{ secrets.GMAIL_PASS || secrets.GMAIL_APP_PASSWORD }}
           EMAIL_DEST: ${{ secrets.EMAIL_DEST }}
+          FORCE_SIEDCO_NOTIFICATION: ${{ inputs.notify || 'false' }}
         run: python monitor_siedco.py
 
       - name: Reportar estado al Centro de fuentes SISC
