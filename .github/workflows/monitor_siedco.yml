@@ -4,11 +4,20 @@ on:
   schedule:
     # Corre cada 12 horas (a las 00:00 y 12:00 UTC)
     - cron: "0 */12 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "monitor_siedco.py"
+      - "sisc_heartbeat.py"
+      - ".github/workflows/monitor_siedco.yml"
   workflow_dispatch:
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout repositorio
         uses: actions/checkout@v4
@@ -35,8 +44,17 @@ jobs:
             siedco-cache-
 
       - name: Ejecutar Monitor SIEDCO
+        id: monitor_run
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_PASS: ${{ secrets.GMAIL_PASS || secrets.GMAIL_APP_PASSWORD }}
           EMAIL_DEST: ${{ secrets.EMAIL_DEST }}
         run: python monitor_siedco.py
+
+      - name: Reportar estado al Centro de fuentes SISC
+        if: always()
+        continue-on-error: true
+        env:
+          SISC_API_URL: "https://sisc-backend.onrender.com/api"
+          SISC_MONITOR_OUTCOME: ${{ steps.monitor_run.outcome }}
+        run: python sisc_heartbeat.py

@@ -64,3 +64,16 @@ Para habilitar el envío automatizado de las alertas consolidadas por correo, co
 1.  `GMAIL_USER`: Cuenta de correo Gmail emisora (ej: `observatorio.jamundi@gmail.com`).
 2.  `GMAIL_PASS`: Contraseña de aplicación de 16 caracteres generada desde la seguridad de su cuenta Google.
 3.  `EMAIL_DEST`: Correo electrónico del destinatario final del reporte (si se omite, se enviará a la misma cuenta emisora).
+# Integracion con el SISC
+
+Al finalizar cada ejecucion, el workflow envia un heartbeat al Centro de fuentes
+del SISC. El reporte incluye el resultado del monitor, la fecha de corte mas
+reciente, el numero de indicadores validos y las advertencias por cortes
+independientes o datos incompletos.
+
+GitHub Actions se autentica automaticamente mediante OIDC y no necesita una
+clave permanente. El permiso `id-token: write` solo permite solicitar una
+identidad breve para esta ejecucion; el backend valida el repositorio, workflow,
+rama y evento. `SISC_SOURCE_MONITOR_KEY` queda como respaldo para ejecuciones
+fuera de GitHub. El endpoint se toma de `SISC_API_URL` y por defecto apunta al
+backend de produccion.
